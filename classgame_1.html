@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>사상가 톡 미니게임</title>
+
+<style>
+  :root{
+    --bg:#f2f2f2;
+    --card:#ffffff;
+    --accent:#6aa84f;
+    --muted:#777;
+    --bubble-student:#d7e8ff;
+    --bubble-thinker:#f1f1f1;
+    font-family:"Noto Sans KR", -apple-system, system-ui;
+  }
+
+  body{ margin:0; background:var(--bg); color:#222; }
+  .wrap{ max-width:850px; margin:20px auto; padding:20px; }
+
+  header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+  .logo{
+    width:60px; height:60px; border-radius:20px;
+    background:#ffe812; display:flex; align-items:center;
+    justify-content:center; font-size:24px; font-weight:800;
+    color:#3b1e1e;
+  }
+  h1{ margin:0; font-size:20px; }
+
+  .phone{
+    background:var(--card); border-radius:24px;
+    padding:18px; box-shadow:0 6px 20px rgba(0,0,0,0.08);
+  }
+
+  .chat{
+    height:780px; display:flex; flex-direction:column; gap:14px;
+  }
+
+  .top-msg{ max-height:140px; margin-bottom:6px; }
+
+  .messages{
+    flex:1; overflow-y:auto; display:flex;
+    flex-direction:column; gap:10px; padding:6px;
+  }
+
+  .msg{
+    max-width:78%; padding:10px 13px; border-radius:18px;
+    line-height:1.5; font-size:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .student{
+    align-self:flex-end;
+    background:var(--bubble-student);
+    border-bottom-right-radius:4px;
+  }
+
+  .thinker{
+    align-self:flex-start;
+    background:var(--bubble-thinker);
+    border-bottom-left-radius:4px;
+  }
+
+  .meta{ font-size:11px; color:var(--muted); margin-bottom:5px; }
+
+  .choices{
+    display:flex; flex-direction:column; gap:8px; margin-top:10px;
+  }
+
+  .choice{
+    width:100%; padding:10px 11px; border-radius:14px;
+    background:#fff; border:1px solid #e0e0e0; cursor:pointer;
+    font-size:14px; display:flex; justify-content:space-between; align-items:center;
+  }
+
+  .choice span:first-child{ font-weight:700; }
+  .hint{ font-size:11px; color:#666; }
+
+  .choice:hover{ background:#eef8ff; }
+
+  .controls{ display:flex; gap:10px; margin-top:14px; }
+
+  .btn{
+    padding:9px 13px; border-radius:10px; border:0;
+    background:var(--accent); color:#fff; font-weight:700;
+    cursor:pointer; font-size:13px;
+  }
+
+  .btn.secondary{
+    background:#fff; border:1px solid #ccc; color:#333;
+  }
+
+  .scorebar{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;
+  }
+
+  .progress{
+    flex:1; height:8px; background:#e3e3e3;
+    border-radius:6px; margin:0 12px; overflow:hidden;
+  }
+
+  .progress > i{
+    height:100%; display:block;
+    background:linear-gradient(90deg,#b9f6ca,#6aa84f);
+    width:0%;
+  }
+
+  .bubble-enter{ animation:bIn .3s ease; }
+  @keyframes bIn{
+    from{opacity:0; transform:translateY(6px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">톡</div>
+  <div><h1>친구 고민 톡으로 사상가의 도덕 기준을 맞춰보세요</h1></div>
+</header>
+
+<div class="phone">
+  <div class="chat">
+
+    <div class="top-msg" id="topMsg"></div>
+
+    <div class="messages" id="messages"></div>
+
+    <div id="uiArea">
+
+      <div class="scorebar">
+        <div style="font-size:13px;color:#555">문제 <b id="qIndex">1</b> / 10</div>
+        <div class="progress"><i id="prog"></i></div>
+        <div style="font-size:13px;color:#555">점수 <b id="score">0</b></div>
+      </div>
+
+      <div id="choices" class="choices"></div>
+
+      <div class="controls">
+        <button class="btn secondary" id="revealBtn">정답 보기</button>
+        <button class="btn" id="nextBtn" disabled>다음 문제 ▶</button>
+      </div>
+
+      <div id="explain" style="display:none;margin-top:10px;padding:11px;border-radius:10px;background:#fbfbfb;border:1px dashed #ddd;font-size:14px;color:#444"></div>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// 한 줄 정리 유지
+const thinkers = {
+  kant:{label:"칸트", hint:"의무를 지키는 것이 옳다", desc:"아무도 보지 않아도 도덕 원칙을 지키는 것이 중요해."},
+  bentham:{label:"벤담", hint:"최대 다수의 최대 행복", desc:"행동이 얼마나 많은 사람에게 행복을 주는지가 기준이야."},
+  aristotle:{label:"아리스토텔레스", hint:"과하지도 부족하지도 않게", desc:"중용, 즉 지나치지 않음이 중요한 도덕 기준이야."},
+  confucius:{label:"공자", hint:"인(仁)으로 상대 공감하기", desc:"상대의 마음을 먼저 헤아리는 것이 매우 중요해."},
+  buddha:{label:"석가모니", hint:"모든 생명에 자비 베풀기", desc:"고통을 줄여주려는 자비로운 태도가 도덕적이야."},
+  laozi:{label:"노자", hint:"억지로 하지 않고 자연스럽게", desc:"억지로 하지 않고 자연스러움을 따르는 게 옳아."}
+};
+
+// 문제 목록
+let DATA = [
+  {name:"민호", student:"야… 나 방금 친구 지갑을 주웠는데, 아무도 못 봤어. 그냥 가져가면 모를 것 같긴 한데… 계속 찝찝해. 어떻게 해야 하지?", reply:"민호야, 아무도 못 봤다고 해도 네가 지켜야 하는 원칙은 변하지 않아. 옳은 일을 선택해보자.", answer:"kant"},
+  {name:"하린", student:"학교 행사에서 재활용품 작품을 만들기로 했는데, 다수는 쉽게 만들 걸 원하고 몇몇은 의미 있는 걸 하자고 해. 뭐가 좋을까?", reply:"하린아, 어떤 선택이 더 많은 친구들에게 행복을 줄지 생각해보자.", answer:"bentham"},
+  {name:"재윤", student:"반에서 민수가 다른 애를 놀렸는데… 너무 세게 말하면 분위기 나빠지고 너무 가볍게 말하면 친구가 상처받을 것 같아. 뭐라고 해야 할까?", reply:"재윤아, 너무 과하지도 부족하지도 않게 적당한 방식으로 말해보자.", answer:"aristotle"},
+  {name:"소율", student:"동생이 또 장난쳐서 화가 나는데… 소리치자니 미안하고 그냥 넘기자니 억울해. 어떻게 해야 해?", reply:"소율아, 화를 내기 전에 동생의 마음을 먼저 생각해보면 좋겠어.", answer:"confucius"},
+  {name:"준호", student:"학교 오는 길에 다친 고양이를 봤는데… 도와주자니 시간 걱정되고 그냥 지나치자니 마음이 쓰여. 어떻게 해야 하지?", reply:"준호야, 모든 생명에게 자비를 베푸는 마음을 한 번 떠올려보자.", answer:"buddha"},
+  {name:"다연", student:"친구가 실수했는데 내가 억지로 뭐라 하면 더 문제될 것 같아. 나서야 할까?", reply:"다연아, 억지로 해결하려 하지 말고 조금 자연스럽게 흘러가게 기다려보는 것도 방법이야.", answer:"laozi"},
+  {name:"도현", student:"친구가 시험 전에 답 알려달라고 해서 고민이야… 규칙 어기는 거라서.", reply:"도현아, 정직하게 임하는 건 지켜야 할 원칙이야.", answer:"kant"},
+  {name:"가윤", student:"교실 분위기 개선 활동을 정해야 하는데 다수는 쉬운 걸 원하고 몇 명은 의미 있는 활동을 원해. 뭐가 좋을까?", reply:"가윤아, 어떤 선택이 많은 친구에게 기쁨을 줄지 생각해보자.", answer:"bentham"},
+  {name:"시온", student:"친구가 축제 준비 때문에 힘들대서 고민을 털어놨는데… 너무 솔직하면 상처 줄까 고민돼.", reply:"시온아, 덕 있는 사람이 할 말을 떠올려보면 좋겠어.", answer:"aristotle"},
+  {name:"하준", student:"체육 시간 팀 나누는 걸 두고 반 분위기가 어수선해. 내가 나서면 더 복잡해질까?", reply:"하준아, 꼭 네가 나서지 않아도 될 수도 있어. 자연스럽게 흘러가게 하는 것도 선택이야.", answer:"laozi"}
+];
+
+// 🔥 문제 순서 랜덤 셔플
+DATA = DATA
+  .map(v => ({v, sort:Math.random()}))
+  .sort((a,b)=>a.sort-b.sort)
+  .map(obj=>obj.v);
+
+// 랜덤 오답 메시지
+const wrongMessages = [
+  "조금 다르게 생각해볼까?",
+  "아직 정답은 아니야. 한 번 더 고민해보자!",
+  "좋은 시도였어! 다시 한 번 생각해볼래?",
+  "조금만 더 생각하면 맞출 수 있을 것 같아!",
+  "사상가들의 기준을 떠올려보자."
+];
+
+let idx=0, score=0, firstTry=true;
+
+const topMsg=document.getElementById("topMsg");
+const messages=document.getElementById("messages");
+const choicesDiv=document.getElementById("choices");
+const qIndex=document.getElementById("qIndex");
+const prog=document.getElementById("prog");
+const scoreEl=document.getElementById("score");
+const explain=document.getElementById("explain");
+const revealBtn=document.getElementById("revealBtn");
+const nextBtn=document.getElementById("nextBtn");
+
+// 고민 톡 고정
+function setTopMessage(item){
+  topMsg.innerHTML=
+    `<div class="msg student">
+      <div class="meta">${item.name}가 보낸 고민 톡 💬</div>
+      ${item.student}
+    </div>`;
+}
+
+// 메시지 추가 + 자동 스크롤
+function pushMsg(html, cls, meta){
+  const el=document.createElement("div");
+  el.className="msg bubble-enter "+cls;
+  el.innerHTML=(meta?`<div class='meta'>${meta}</div>`:"")+html;
+  messages.appendChild(el);
+  messages.scrollTop=messages.scrollHeight;
+}
+
+function renderQuestion(){
+  explain.style.display="none"; explain.innerHTML="";
+  nextBtn.disabled=true;
+  revealBtn.disabled=false;
+  choicesDiv.innerHTML="";
+  messages.innerHTML="";
+  firstTry=true;  // 🔥 새 문제 시작 시 true로 초기화
+
+  qIndex.textContent=idx+1;
+  prog.style.width=(idx/10*100)+"%";
+  scoreEl.textContent=score;
+
+  const item=DATA[idx];
+  setTopMessage(item);
+
+  setTimeout(()=>{
+    pushMsg(item.reply,"thinker","사상가의 답장 ✉️");
+
+    Object.keys(thinkers).forEach(k=>{
+      const btn=document.createElement("button");
+      btn.className="choice";
+      btn.dataset.key=k;
+      btn.innerHTML=
+        `<span>${thinkers[k].label}</span>
+         <span class="hint">${thinkers[k].hint}</span>`;
+      btn.onclick=choose;
+      choicesDiv.appendChild(btn);
+    });
+  },500);
+}
+
+function choose(e){
+  const pick=e.currentTarget.dataset.key;
+  const item=DATA[idx];
+
+  if(pick===item.answer){
+    // 🔥 정답일 때 점수는 firstTry일 때만 증가
+    if(firstTry){
+      score++;
+      scoreEl.textContent=score;
+    }
+
+    Array.from(choicesDiv.children).forEach(b=>b.disabled=true);
+    e.currentTarget.style.background="#d3f9d8";
+
+    pushMsg(`정답이야! 지금 선택은 ${thinkers[pick].label}의 관점과 잘 맞아. 👏`,"thinker");
+    explain.style.display="block";
+    explain.textContent = thinkers[pick].desc;
+
+    nextBtn.disabled=false;
+    revealBtn.disabled=true;
+  }
+
+  else {
+    // 🔥 오답 → firstTry=false
+    firstTry = false;
+
+    const msg = wrongMessages[Math.floor(Math.random()*wrongMessages.length)];
+    pushMsg(msg,"thinker","다시 생각해보기 ✏️");
+  }
+}
+
+revealBtn.onclick=()=>{
+  const item=DATA[idx];
+  pushMsg(`정답은 ${thinkers[item.answer].label}의 관점이야.`,"thinker","정답 안내");
+  explain.style.display="block";
+  explain.textContent = thinkers[item.answer].desc;
+  nextBtn.disabled=false;
+  revealBtn.disabled=true;
+  Array.from(choicesDiv.children).forEach(b=>b.disabled=true);
+};
+
+nextBtn.onclick=()=>{
+  idx++;
+  if(idx>=DATA.length){
+    finish();
+  } else {
+    renderQuestion();
+  }
+};
+
+function finish(){
+  prog.style.width="100%";
+  const html=
+    `<div style="font-size:22px;font-weight:800;margin-top:20px;">게임 완료!</div>
+     <div style="margin-top:8px;font-size:16px;">최종 점수: ${score} / 10</div>
+     <button class="btn" style="margin-top:14px;" onclick="location.reload()">다시하기</button>`
+  document.getElementById("uiArea").innerHTML = html;
+}
+
+renderQuestion();
+</script>
+
+</body>
+</html>
